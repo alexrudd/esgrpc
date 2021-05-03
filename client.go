@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/EventStore/EventStore-Client-Go/protos/shared"
 	api "github.com/EventStore/EventStore-Client-Go/protos/streams"
@@ -46,9 +45,7 @@ func (c *Client) Read(ctx context.Context, h func(*api.ReadResp_ReadEvent, error
 
 		for {
 			resp, err := readClient.Recv()
-			if err == io.EOF {
-				return
-			} else if err != nil {
+			if err != nil {
 				h(nil, err)
 				return
 			}
