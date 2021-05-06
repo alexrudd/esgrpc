@@ -311,6 +311,16 @@ func WithCheckpointInterval(interval uint32) FilterOption {
 	}
 }
 
+func WithoutFilter() ReadOption {
+	return func(cfg *readConfig) error {
+		cfg.options.FilterOption = &api.ReadReq_Options_NoFilter{
+			NoFilter: &shared.Empty{},
+		}
+
+		return nil
+	}
+}
+
 func WithStructuredUUID() ReadOption {
 	return func(cfg *readConfig) error {
 		cfg.options.UuidOption = &api.ReadReq_Options_UUIDOption{
