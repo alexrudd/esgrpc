@@ -58,6 +58,12 @@ func newDefaultReadConfig() *readConfig {
 	}
 }
 
+func NoOpOption() ReadOption {
+	return func(cfg *readConfig) error {
+		return nil
+	}
+}
+
 func WithReadStoppedHandler(h func(error)) ReadOption {
 	return func(cfg *readConfig) error {
 		cfg.readStopped = h
@@ -177,6 +183,13 @@ func FromEndPosition() AllOption {
 
 		return nil
 	}
+}
+
+func InDirection(backwards bool) ReadOption {
+	if backwards {
+		return InBackwardsDirection()
+	}
+	return NoOpOption()
 }
 
 func InBackwardsDirection() ReadOption {
