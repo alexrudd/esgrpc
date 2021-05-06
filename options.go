@@ -27,33 +27,57 @@ import (
 //  * Structured
 //  * String
 
-func NewDefaultReadOptions() *api.ReadReq_Options {
-	return &api.ReadReq_Options{
-		StreamOption: &api.ReadReq_Options_All{
-			All: &api.ReadReq_Options_AllOptions{
-				AllOption: &api.ReadReq_Options_AllOptions_Start{},
+type readConfig struct {
+	options           *api.ReadReq_Options
+	checkpointReached func(*api.ReadResp_Checkpoint)
+	readStopped       func(error)
+}
+
+func newDefaultReadConfig() *readConfig {
+	return &readConfig{
+		options: &api.ReadReq_Options{
+			StreamOption: &api.ReadReq_Options_All{
+				All: &api.ReadReq_Options_AllOptions{
+					AllOption: &api.ReadReq_Options_AllOptions_Start{},
+				},
+			},
+			ReadDirection: api.ReadReq_Options_Forwards,
+			ResolveLinks:  false,
+			CountOption: &api.ReadReq_Options_Subscription{
+				Subscription: &api.ReadReq_Options_SubscriptionOptions{},
+			},
+			FilterOption: &api.ReadReq_Options_NoFilter{
+				NoFilter: &shared.Empty{},
+			},
+			UuidOption: &api.ReadReq_Options_UUIDOption{
+				Content: &api.ReadReq_Options_UUIDOption_String_{
+					String_: &shared.Empty{},
+				},
 			},
 		},
-		ReadDirection: api.ReadReq_Options_Forwards,
-		ResolveLinks:  false,
-		CountOption: &api.ReadReq_Options_Subscription{
-			Subscription: &api.ReadReq_Options_SubscriptionOptions{},
-		},
-		FilterOption: &api.ReadReq_Options_NoFilter{
-			NoFilter: &shared.Empty{},
-		},
-		UuidOption: &api.ReadReq_Options_UUIDOption{
-			Content: &api.ReadReq_Options_UUIDOption_String_{
-				String_: &shared.Empty{},
-			},
-		},
+	}
+}
+
+func WithReadStoppedHandler(h func(error)) ReadOption {
+	return func(cfg *readConfig) error {
+		cfg.readStopped = h
+
+		return nil
+	}
+}
+
+func WithCheckpointHandler(h func(*api.ReadResp_Checkpoint)) ReadOption {
+	return func(cfg *readConfig) error {
+		cfg.checkpointReached = h
+
+		return nil
 	}
 }
 
 type StreamOption func(*api.ReadReq_Options_Stream) error
 
 func WithStreamOptions(opts ...StreamOption) ReadOption {
-	return func(rr *api.ReadReq_Options) error {
+	return func(cfg *readConfig) error {
 		so := &api.ReadReq_Options_Stream{
 			Stream: &api.ReadReq_Options_StreamOptions{},
 		}
@@ -64,7 +88,7 @@ func WithStreamOptions(opts ...StreamOption) ReadOption {
 			}
 		}
 
-		rr.StreamOption = so
+		cfg.options.StreamOption = so
 
 		return nil
 	}
@@ -109,7 +133,7 @@ func FromEndRevision() StreamOption {
 type AllOption func(*api.ReadReq_Options_All) error
 
 func WithAllOptions(opts ...AllOption) ReadOption {
-	return func(rr *api.ReadReq_Options) error {
+	return func(cfg *readConfig) error {
 		so := &api.ReadReq_Options_All{
 			All: &api.ReadReq_Options_AllOptions{},
 		}
@@ -120,7 +144,7 @@ func WithAllOptions(opts ...AllOption) ReadOption {
 			}
 		}
 
-		rr.StreamOption = so
+		cfg.options.StreamOption = so
 
 		return nil
 	}
@@ -156,24 +180,24 @@ func FromEndPosition() AllOption {
 }
 
 func InBackwardsDirection() ReadOption {
-	return func(rr *api.ReadReq_Options) error {
-		rr.ReadDirection = api.ReadReq_Options_Backwards
+	return func(cfg *readConfig) error {
+		cfg.options.ReadDirection = api.ReadReq_Options_Backwards
 
 		return nil
 	}
 }
 
 func WithLinksResolved() ReadOption {
-	return func(rr *api.ReadReq_Options) error {
-		rr.ResolveLinks = true
+	return func(cfg *readConfig) error {
+		cfg.options.ResolveLinks = true
 
 		return nil
 	}
 }
 
 func ForLimitedCount(count uint64) ReadOption {
-	return func(rr *api.ReadReq_Options) error {
-		rr.CountOption = &api.ReadReq_Options_Count{
+	return func(cfg *readConfig) error {
+		cfg.options.CountOption = &api.ReadReq_Options_Count{
 			Count: count,
 		}
 
@@ -184,7 +208,7 @@ func ForLimitedCount(count uint64) ReadOption {
 type FilterOption func(*api.ReadReq_Options_Filter) error
 
 func WithFilterOptions(opts ...FilterOption) ReadOption {
-	return func(rr *api.ReadReq_Options) error {
+	return func(cfg *readConfig) error {
 		fo := &api.ReadReq_Options_Filter{
 			Filter: &api.ReadReq_Options_FilterOptions{
 				Filter: &api.ReadReq_Options_FilterOptions_StreamIdentifier{
@@ -205,7 +229,7 @@ func WithFilterOptions(opts ...FilterOption) ReadOption {
 			}
 		}
 
-		rr.FilterOption = fo
+		cfg.options.FilterOption = fo
 
 		return nil
 	}
@@ -280,16 +304,16 @@ func WithWindowMax(max uint32) FilterOption {
 }
 
 func WithCheckpointInterval(interval uint32) FilterOption {
-	return func(rr *api.ReadReq_Options_Filter) error {
-		rr.Filter.CheckpointIntervalMultiplier = interval
+	return func(cfg *api.ReadReq_Options_Filter) error {
+		cfg.Filter.CheckpointIntervalMultiplier = interval
 
 		return nil
 	}
 }
 
 func WithStructuredUUID() ReadOption {
-	return func(rr *api.ReadReq_Options) error {
-		rr.UuidOption = &api.ReadReq_Options_UUIDOption{
+	return func(cfg *readConfig) error {
+		cfg.options.UuidOption = &api.ReadReq_Options_UUIDOption{
 			Content: &api.ReadReq_Options_UUIDOption_Structured{
 				Structured: &shared.Empty{},
 			},
