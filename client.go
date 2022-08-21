@@ -111,7 +111,12 @@ func (c *Client) ReadASync(ctx context.Context, h AsyncEventHandler, opts ...Rea
 			}
 
 			resp, err := readClient.Recv()
-			if err != nil {
+			if errors.Is(err, io.EOF) {
+				if config.readStopped != nil {
+					config.readStopped(nil)
+				}
+				return
+			} else if err != nil {
 				if config.readStopped != nil {
 					config.readStopped(err)
 				}
